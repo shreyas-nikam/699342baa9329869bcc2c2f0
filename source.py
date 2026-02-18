@@ -6,29 +6,39 @@ import os
 from datetime import datetime, timezone
 
 # --- OpenAI Client Initialization ---
-# This client will be initialized once when the module is used in an application.
-# It's kept as a module-level variable to avoid re-initialization.
+# This client will be initialized per-user in a multi-user application.
+# It's kept as a module-level variable but can be re-initialized with different API keys.
 _openai_client = None
+_current_api_key = None
 
 def initialize_openai_client(api_key: str = None):
     """
-    Initializes the OpenAI client.
-    If api_key is not provided, it attempts to read from the OPENAI_API_KEY environment variable.
-    This function should be called once at the application's startup.
+    Initializes the OpenAI client with the provided API key.
+    In multi-user environments, this should be called before each agent run with the user's API key.
+    
+    Parameters:
+    - api_key (str): The OpenAI API key. If None, attempts to read from OPENAI_API_KEY 
+                     environment variable (for development/testing only).
     """
-    global _openai_client
-    if _openai_client is not None:
-        print("OpenAI client already initialized.")
-        return
-
+    global _openai_client, _current_api_key
+    
+    # For development/testing: fallback to environment variable
     if api_key is None:
         api_key = os.environ.get("OPENAI_API_KEY")
+        if api_key:
+            print("Warning: Using API key from environment variable. Not recommended for multi-user production.")
 
     if not api_key:
-        raise ValueError("OpenAI API key not provided and not found in environment variables. "
-                         "Please set OPENAI_API_KEY or pass it to initialize_openai_client().")
-    _openai_client = openai.OpenAI(api_key=api_key)
-    print("OpenAI client initialized.")
+        raise ValueError("OpenAI API key not provided. "
+                         "Please provide an API key to initialize_openai_client().")
+    
+    # Re-initialize if the API key has changed (multi-user scenario)
+    if _current_api_key != api_key:
+        _openai_client = openai.OpenAI(api_key=api_key)
+        _current_api_key = api_key
+        print("OpenAI client initialized with new API key.")
+    else:
+        print("OpenAI client already initialized with same API key.")
 
 def get_openai_client():
     """
